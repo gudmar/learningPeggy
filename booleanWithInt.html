@@ -1,0 +1,190 @@
+
+  
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <!-- <script src="https://unpkg.com/peggy"></script> -->
+    <script src="https://cdn.jsdelivr.net/npm/peggy"></script>
+    <title>Peggy</title>
+</head>
+<body>
+    <style>
+        body{margin:0; background-color: gray;font-family: Arial, Helvetica, sans-serif;color:white;}
+        .wrong{background-color:#900;color:white;}
+        .correct{background-color:green;color:white;}
+        .note{max-width: 900px; padding: 5px; border:white solid thin; border-radius: 15px; margin-left: auto; margin-right: auto; margin-bottom: 1rem;}
+        h1{text-align: center;}
+        td{padding:15px;}
+        th{background-color:black; padding:5px;}
+        table{margin-left:auto; margin-right:auto;}
+    </style>
+    <h1>Natural & boolean parser:</h1>
+    <div class="note">
+        <i>Parses boolean values, evaluates numeric operations that result is a natural number, casts
+           them to boolean (===0 is false, else true) and parses as boolean expression
+        </i>
+    </div>
+    <div id="outlet"></div>
+    <script>
+        const testCases = [
+            {input:'false|false' , expected: 'false'},
+            {input:'true | true' , expected: 'true'},
+            {input:'false | true' , expected: 'true'},
+            {input:'(false | true) & true' , expected: 'true'},
+            {input:'(false | true) & false' , expected: 'false'},
+            {input:'false | false & true' , expected: 'false'},
+            {input:'false | false | true' , expected: 'true'},
+            {input:'true & (false | false | true)' , expected: 'true'},
+            {input:'(true | true) & (true | false)' , expected: 'true'},
+            {input:'(true | true & false) & (true | false)' , expected: 'true'},
+            {input:'!(false)' , expected: 'true'},
+            {input:'!true' , expected: 'false'},
+            {input:'!(true & (true & (false | true)))' , expected: 'false'},
+            {input:'59' , expected: 'true'},
+            {input:'0' , expected: 'false'},
+            {input:'5 & 3', expected: 'true'},
+            {input:'false | 2', expected: 'true'},
+            {input:'(true | true & false) & (4 | 0)' , expected: 'true'},
+        ]
+
+        function placeTable(outlet_css){
+            let outlet = document.querySelector(outlet_css)
+            outlet.insertAdjacentHTML('afterBegin',`
+            <table>
+                <thead><tr><th>Case</th><th>Expected</th><th>Actual</th></tr></thead>
+                <tbody id="test-outlet">
+                </tbody>
+            </table>
+            `)
+        }
+        function addRow(data){
+            const {testCase, expected, actual} = {...data}
+            function getOutlet(){ 
+                let outlet = document.querySelector('#test-outlet');
+                if (outlet === null || outlet === undefined) {
+                    placeTable('#outlet');
+                    outlet = document.querySelector('#test-outlet');
+                } 
+                return outlet;
+            }
+            const outlet = getOutlet();
+            // console.log(typeof expected)
+            // console.log(typeof actual)
+            // console.log(expected === actual)
+            const correctClass = (expected === actual?'correct':'wrong')
+            outlet.insertAdjacentHTML('beforeEnd', `
+            <tr class='${correctClass}'><td>${testCase}</td><td>${expected}</td><td>${actual}</td></tr>
+            `)
+        }
+   
+        var parser = peggy.generate(`
+Expression // Term
+  = head:Term tail:(_ ("|") _ Term _)* {
+      return tail.reduce(function(result, element) {
+        if (element[1] === "|") { return result || element[3]; }
+      }, head);
+    }
+Term 
+ = head:Factor tail:(_ ("&") _ Factor _)* {
+      return tail.reduce(function(result, element) {
+         return result && element[3]; 
+      }, head);
+    }
+
+Factor
+    = PositiveFactor / NegativeFactor
+
+PositiveFactor
+  = "(" _ expr:Expression _ ")" { return expr; }
+  / Boolean
+
+NegativeFactor
+    = "!"fac:Factor {
+        console.log(fac)
+        return !fac
+        }
+
+Boolean "boolean"
+ = true / false / integer2bool
+
+
+integer2bool
+    = val:Integer {
+        return val===0?false:true
+    }
+
+
+true 
+	= _ 'true' {return true}
+false
+	= _ 'false' {return false}    
+  
+Integer "integer"
+  = _ [0-9]+ { return parseInt(text(), 10); }
+  
+    
+_ "whitespace"
+  = [ \\t\\n\\r]*
+    
+    `)
+
+        function execute(testCases){
+            const testedFunction = parser.parse;
+            for(let testCase of testCases){
+                const {input, expected} = testCase;
+                console.log(input)
+                const result = testedFunction(input)+'';
+                addRow({testCase: input, expected: expected, actual: result})
+            }
+        }
+
+        execute(testCases);
+
+    </script>
+</body>
+</html>
+
+
+
+
+<!-- Working so Far
+Expression // Term
+  = head:Term tail:(_ ("|") _ Term _)* {
+      return tail.reduce(function(result, element) {
+          console.log(element[3])
+          console.log('|')
+          console.log(result)
+          console.log(result || element[3])
+        if (element[1] === "|") { return result || element[3]; }
+      }, head);
+    }
+Term 
+ = head:Factor tail:(_ ("&") _ Factor _)* {
+      return tail.reduce(function(result, element) {
+          console.log('Term')
+          console.log(result) 
+          console.log(element[3])
+         return result && element[3]; 
+      }, head);
+    }
+Factor
+  = "(" _ expr:Expression _ ")" { return expr; }
+  / Boolean
+Boolean "boolean"
+ = true / false
+  //= _ ['true'|'false'] { return Boolean(text()); }
+  
+Integer "integer"
+  = _ [0-9]+ { return parseInt(text(), 10); }
+  
+true 
+	= _ 'true' {return true}
+false
+	= _ 'false' {return false}
+    
+_ "whitespace"
+  = [ \\t\\n\\r]*
+     -->
